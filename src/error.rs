@@ -57,6 +57,15 @@ pub enum Error {
 
     #[fail(display = "Not Configured")]
     NotConfigured,
+
+    #[fail(display = "Error processing PGP key: {}", _0)]
+    Key(#[cause] crate::key::Error, failure::Backtrace),
+
+    #[fail(display = "Invalid email address: {}", _0)]
+    InvalidEmail(
+        #[cause] crate::dc_tools::InvalidEmailError,
+        failure::Backtrace,
+    ),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -148,6 +157,18 @@ impl From<lettre_email::error::Error> for Error {
 impl From<mime::FromStrError> for Error {
     fn from(err: mime::FromStrError) -> Error {
         Error::FromStr(err)
+    }
+}
+
+impl From<crate::key::Error> for Error {
+    fn from(err: crate::key::Error) -> Error {
+        Error::Key(err, failure::Backtrace::new())
+    }
+}
+
+impl From<crate::dc_tools::InvalidEmailError> for Error {
+    fn from(err: crate::dc_tools::InvalidEmailError) -> Error {
+        Error::InvalidEmail(err, failure::Backtrace::new())
     }
 }
 

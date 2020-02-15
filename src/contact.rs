@@ -12,10 +12,9 @@ use crate::config::Config;
 use crate::constants::*;
 use crate::context::Context;
 use crate::dc_tools::*;
-use crate::e2ee;
 use crate::error::{Error, Result};
 use crate::events::Event;
-use crate::key::*;
+use crate::key::{DcKey, Key, SignedPublicKey};
 use crate::login_param::LoginParam;
 use crate::message::{MessageState, MsgId};
 use crate::mimeparser::AvatarAction;
@@ -642,8 +641,6 @@ impl Contact {
             let peerstate = Peerstate::from_addr(context, &context.sql, &contact.addr);
             let loginparam = LoginParam::from_database(context, "configured_");
 
-            let mut self_key = Key::from_self_public(context, &loginparam.addr, &context.sql);
-
             if peerstate.is_some()
                 && peerstate
                     .as_ref()
@@ -658,16 +655,11 @@ impl Contact {
                         StockMessage::E2eAvailable
                     });
                 ret += &p;
-                if self_key.is_none() {
-                    e2ee::ensure_secret_key_exists(context)?;
-                    self_key = Key::from_self_public(context, &loginparam.addr, &context.sql);
-                }
+                let self_key = Key::from(SignedPublicKey::load_self(context)?);
                 let p = context.stock_str(StockMessage::FingerPrints);
                 ret += &format!(" {}:", p);
 
-                let fingerprint_self = self_key
-                    .map(|k| k.formatted_fingerprint())
-                    .unwrap_or_default();
+                let fingerprint_self = self_key.formatted_fingerprint();
                 let fingerprint_other_verified = peerstate
                     .peek_key(PeerstateVerifiedStatus::BidirectVerified)
                     .map(|k| k.formatted_fingerprint())
