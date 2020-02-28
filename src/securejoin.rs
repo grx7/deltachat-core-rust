@@ -625,7 +625,7 @@ pub(crate) fn handle_securejoin_handshake(
                 send_handshake_msg(context, contact_chat_id, "vc-contact-confirm", "", None, "");
                 inviter_progress!(context, contact_id, 1000);
             }
-            Ok(HandshakeMessage::Done)
+            Ok(HandshakeMessage::Ignore) // "Done" would delete the message and break multi-device (the key from Autocrypt-header is needed)
         }
         "vg-member-added" | "vc-contact-confirm" => {
             /*=======================================================
@@ -726,7 +726,7 @@ pub(crate) fn handle_securejoin_handshake(
             Ok(if join_vg {
                 HandshakeMessage::Propagate
             } else {
-                HandshakeMessage::Done
+                HandshakeMessage::Ignore // "Done" deletes the message and breaks multi-device
             })
         }
         "vg-member-added-received" => {
@@ -757,7 +757,7 @@ pub(crate) fn handle_securejoin_handshake(
                     chat_id: group_chat_id,
                     contact_id,
                 });
-                Ok(HandshakeMessage::Done)
+                Ok(HandshakeMessage::Ignore) // "Done" deletes the message and breaks multi-device
             } else {
                 warn!(context, "vg-member-added-received invalid.",);
                 Ok(HandshakeMessage::Ignore)
