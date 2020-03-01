@@ -21,21 +21,22 @@ pub use pgp::composed::{SignedPublicKey, SignedSecretKey};
 
 /// Error type for deltachat key handling.
 #[derive(Fail, Debug)]
+#[non_exhaustive]
 pub enum Error {
     #[fail(display = "Could not decode base64")]
     Base64Decode(#[cause] base64::DecodeError, failure::Backtrace),
     #[fail(display = "rPGP error: {}", _0)]
     Pgp(#[cause] pgp::errors::Error, failure::Backtrace),
-    #[fail(display = "Failed to load key: {}", _0)]
-    Load(#[cause] sql::Error, failure::Backtrace),
+    // #[fail(display = "Failed to load key: {}", _0)]
+    // Load(#[cause] sql::Error, failure::Backtrace),
     #[fail(display = "No address configured")]
     NoConfiguredAddr(failure::Backtrace),
-    #[fail(display = "Configured address is invalid: {}", _0)]
-    InvalidConfiguredAddr(#[cause] InvalidEmailError, failure::Backtrace),
-    #[fail(display = "Failed to generate PGP key: {}", _0)]
-    Keygen(#[cause] crate::pgp::PgpKeygenError, failure::Backtrace),
-    #[fail(display = "Failed to save generated key: {}", _0)]
-    Keystore(#[cause] SaveKeyError, failure::Backtrace),
+    // #[fail(display = "Configured address is invalid: {}", _0)]
+    // InvalidConfiguredAddr(#[cause] InvalidEmailError, failure::Backtrace),
+    // #[fail(display = "Failed to generate PGP key: {}", _0)]
+    // Keygen(#[cause] crate::pgp::PgpKeygenError, failure::Backtrace),
+    // #[fail(display = "Failed to save generated key: {}", _0)]
+    // Keystore(#[cause] SaveKeyError, failure::Backtrace),
 }
 
 impl From<base64::DecodeError> for Error {
@@ -51,26 +52,30 @@ impl From<pgp::errors::Error> for Error {
 }
 
 impl From<sql::Error> for Error {
-    fn from(err: sql::Error) -> Error {
-        Error::Load(err, failure::Backtrace::new())
+    fn from(_err: sql::Error) -> Error {
+        // Error::Load(err, failure::Backtrace::new())
+        Error::NoConfiguredAddr(failure::Backtrace::new())
     }
 }
 
 impl From<InvalidEmailError> for Error {
-    fn from(err: InvalidEmailError) -> Error {
-        Error::InvalidConfiguredAddr(err, failure::Backtrace::new())
+    fn from(_err: InvalidEmailError) -> Error {
+        // Error::InvalidConfiguredAddr(err, failure::Backtrace::new())
+        Error::NoConfiguredAddr(failure::Backtrace::new())
     }
 }
 
 impl From<crate::pgp::PgpKeygenError> for Error {
-    fn from(err: crate::pgp::PgpKeygenError) -> Error {
-        Error::Keygen(err, failure::Backtrace::new())
+    fn from(_err: crate::pgp::PgpKeygenError) -> Error {
+        // Error::Keygen(err, failure::Backtrace::new())
+        Error::NoConfiguredAddr(failure::Backtrace::new())
     }
 }
 
 impl From<SaveKeyError> for Error {
-    fn from(err: SaveKeyError) -> Error {
-        Error::Keystore(err, failure::Backtrace::new())
+    fn from(_err: SaveKeyError) -> Error {
+        // Error::Keystore(err, failure::Backtrace::new())
+        Error::NoConfiguredAddr(failure::Backtrace::new())
     }
 }
 
@@ -202,7 +207,7 @@ fn generate_keypair(context: &Context) -> Result<KeyPair> {
             );
             Ok(keypair)
         }
-        Err(err) => Err(err)?,
+        Err(err) => Err(err.into()),
     }
 }
 
