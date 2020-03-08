@@ -133,7 +133,7 @@ impl Chatlist {
                    AND c.id IN(SELECT chat_id FROM chats_contacts WHERE contact_id=?2)
                  GROUP BY c.id
                  ORDER BY c.archived=?3 DESC, IFNULL(m.timestamp,c.created_timestamp) DESC, m.id DESC;",
-                params![MessageState::OutDraft, query_contact_id as i32, ChatVisibility::Pinned],
+                paramsv![MessageState::OutDraft, query_contact_id as i32, ChatVisibility::Pinned],
                 process_row,
                 process_rows,
             ).await?
@@ -156,7 +156,7 @@ impl Chatlist {
                    AND c.archived=1
                  GROUP BY c.id
                  ORDER BY IFNULL(m.timestamp,c.created_timestamp) DESC, m.id DESC;",
-                    params![MessageState::OutDraft],
+                    paramsv![MessageState::OutDraft],
                     process_row,
                     process_rows,
                 )
@@ -189,7 +189,7 @@ impl Chatlist {
                    AND c.name LIKE ?
                  GROUP BY c.id
                  ORDER BY IFNULL(m.timestamp,c.created_timestamp) DESC, m.id DESC;",
-                    params![MessageState::OutDraft, str_like_cmd],
+                    paramsv![MessageState::OutDraft, str_like_cmd],
                     process_row,
                     process_rows,
                 )
@@ -211,7 +211,7 @@ impl Chatlist {
                    AND NOT c.archived=?2
                  GROUP BY c.id
                  ORDER BY c.archived=?3 DESC, IFNULL(m.timestamp,c.created_timestamp) DESC, m.id DESC;",
-                params![MessageState::OutDraft, ChatVisibility::Archived, ChatVisibility::Pinned],
+                paramsv![MessageState::OutDraft, ChatVisibility::Archived, ChatVisibility::Pinned],
                 process_row,
                 process_rows,
             ).await?;
@@ -321,9 +321,15 @@ impl Chatlist {
             ret.text2 = None;
         } else if lastmsg.is_none() || lastmsg.as_ref().unwrap().from_id == DC_CONTACT_ID_UNDEFINED
         {
-            ret.text2 = Some(context.stock_str(StockMessage::NoMessages).to_string());
+            ret.text2 = Some(
+                context
+                    .stock_str(StockMessage::NoMessages)
+                    .await
+                    .to_string(),
+            );
         } else {
-            ret.fill(&mut lastmsg.unwrap(), chat, lastcontact.as_ref(), context);
+            ret.fill(&mut lastmsg.unwrap(), chat, lastcontact.as_ref(), context)
+                .await;
         }
 
         ret
@@ -341,7 +347,7 @@ pub async fn dc_get_archived_cnt(context: &Context) -> u32 {
         .query_get_value(
             context,
             "SELECT COUNT(*) FROM chats WHERE blocked=0 AND archived=1;",
-            params![],
+            paramsv![],
         )
         .await
         .unwrap_or_default()
@@ -364,7 +370,7 @@ async fn get_last_deaddrop_fresh_msg(context: &Context) -> Option<MsgId> {
                 "   AND c.blocked=2",
                 " ORDER BY m.timestamp DESC, m.id DESC;"
             ),
-            params![],
+            paramsv![],
         )
         .await
 }
@@ -377,7 +383,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_try_load() {
-        let t = dummy_context();
+        let t = dummy_context().await;
         let chat_id1 = create_group_chat(&t.ctx, VerifiedStatus::Unverified, "a chat")
             .await
             .unwrap();
@@ -398,7 +404,7 @@ mod tests {
         // drafts are sorted to the top
         let mut msg = Message::new(Viewtype::Text);
         msg.set_text(Some("hello".to_string()));
-        chat_id2.set_draft(&t.ctx, Some(&mut msg));
+        chat_id2.set_draft(&t.ctx, Some(&mut msg)).await;
         let chats = Chatlist::try_load(&t.ctx, 0, None, None).await.unwrap();
         assert_eq!(chats.get_chat_id(0), chat_id2);
 
@@ -425,8 +431,8 @@ mod tests {
 
     #[async_std::test]
     async fn test_search_special_chat_names() {
-        let t = dummy_context();
-        t.ctx.update_device_chats().unwrap();
+        let t = dummy_context().await;
+        t.ctx.update_device_chats().await.unwrap();
 
         let chats = Chatlist::try_load(&t.ctx, 0, Some("t-1234-s"), None)
             .await
@@ -439,6 +445,7 @@ mod tests {
 
         t.ctx
             .set_stock_translation(StockMessage::SavedMessages, "test-1234-save".to_string())
+            .await
             .unwrap();
         let chats = Chatlist::try_load(&t.ctx, 0, Some("t-1234-s"), None)
             .await
@@ -447,6 +454,7 @@ mod tests {
 
         t.ctx
             .set_stock_translation(StockMessage::DeviceMessages, "test-5678-babbel".to_string())
+            .await
             .unwrap();
         let chats = Chatlist::try_load(&t.ctx, 0, Some("t-5678-b"), None)
             .await
@@ -456,14 +464,14 @@ mod tests {
 
     #[async_std::test]
     async fn test_get_summary_unwrap() {
-        let t = dummy_context();
+        let t = dummy_context().await;
         let chat_id1 = create_group_chat(&t.ctx, VerifiedStatus::Unverified, "a chat")
             .await
             .unwrap();
 
         let mut msg = Message::new(Viewtype::Text);
         msg.set_text(Some("foo:\nbar \r\n test".to_string()));
-        chat_id1.set_draft(&t.ctx, Some(&mut msg));
+        chat_id1.set_draft(&t.ctx, Some(&mut msg)).await;
 
         let chats = Chatlist::try_load(&t.ctx, 0, None, None).await.unwrap();
         let summary = chats.get_summary(&t.ctx, 0, None).await;
